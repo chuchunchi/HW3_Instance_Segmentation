@@ -178,13 +178,23 @@ def main(cfg):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = get_model(5).to(device)
     
-    optimizer = torch.optim.SGD(
-        [p for p in model.parameters() if p.requires_grad],
-        lr=cfg.lr,
-        momentum=0.9,
-        weight_decay=1e-4,
-        nesterov=True
-    )
+    # Setup optimizer based on choice
+    if cfg.optimizer == 'sgd':
+        optimizer = torch.optim.SGD(
+            [p for p in model.parameters() if p.requires_grad],
+            lr=cfg.lr,
+            momentum=0.9,
+            weight_decay=1e-4,
+            nesterov=True
+        )
+    else:  # adamw
+        optimizer = torch.optim.AdamW(
+            [p for p in model.parameters() if p.requires_grad],
+            lr=cfg.lr,
+            weight_decay=1e-4,
+            betas=(0.9, 0.999),
+            eps=1e-8
+        )
     
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.epochs)
     scaler = torch.cuda.amp.GradScaler() if device.type == 'cuda' else None
@@ -239,6 +249,8 @@ def parse_args():
     parser.add_argument('--batch', type=int, default=2)
     parser.add_argument('--lr', type=float, default=5e-3)
     parser.add_argument('--outdir', default='output')
+    parser.add_argument('--optimizer', choices=['sgd', 'adamw'], default='sgd',
+                      help='Choose optimizer: sgd or adamw')
     return parser.parse_args()
 
 
