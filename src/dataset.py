@@ -165,6 +165,57 @@ class CellDataset(Dataset):
         return img.transpose(2, 0, 1)
 
 
+class TestImageDataset(Dataset):
+    """Dataset for inference on test images.
+    
+    This dataset loads test images for inference without requiring masks or labels.
+    
+    Args:
+        root: Path to the directory containing test images
+    """
+    
+    def __init__(self, root: Union[str, Path]):
+        """Initialize the test dataset.
+        
+        Args:
+            root: Path to the directory containing test images
+        """
+        self.root = Path(root)
+        self.image_files = sorted(list(self.root.glob("*.tif")))
+        self.image_paths = [str(p) for p in self.image_files]
+
+    def __len__(self) -> int:
+        """Return the number of test images."""
+        return len(self.image_files)
+
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, str]:
+        """Get a test image.
+        
+        Args:
+            idx: Index of the image to retrieve
+            
+        Returns:
+            Tuple containing:
+                - image: Tensor of shape (3, H, W) containing the RGB image
+                - image_path: Path to the image file
+        """
+        path = self.image_files[idx]
+        image = tifffile.imread(str(path))
+        
+        # Convert to RGB format
+        if image.ndim == 2:  # Grayscale
+            image = torch.from_numpy(image).float().unsqueeze(0).repeat(3, 1, 1)
+        elif image.shape[2] == 3:  # RGB
+            image = torch.from_numpy(image).permute(2, 0, 1).float()
+        else:  # Multi-channel
+            image = torch.from_numpy(image[:, :, :3]).permute(2, 0, 1).float()
+            
+        # Normalize to [0, 1]
+        image /= 255.0
+        
+        return image, self.image_paths[idx]
+
+
 def collate_fn(batch: List[Tuple[torch.Tensor, Union[Dict[str, torch.Tensor], str]]]) -> Tuple[List[torch.Tensor], List[Union[Dict[str, torch.Tensor], str]]]:
     """Collate function for DataLoader.
     
