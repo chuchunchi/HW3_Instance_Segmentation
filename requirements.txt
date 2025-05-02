@@ -1,0 +1,10 @@
+opencv-python
+torch
+torchvision
+scikit-image
+matplotlib
+tifffile
+pycocotools
+albumentations
+imagecodecs
+scikit-learn
