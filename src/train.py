@@ -81,9 +81,21 @@ class AlbuAdapter:
         }
 
 
-def get_model(num_classes: int):
+def get_model(num_classes: int, model: str):
     """Get Mask R-CNN model with custom number of classes."""
-    model = torchvision.models.detection.maskrcnn_resnet50_fpn(weights='DEFAULT')
+    
+    if model == 'v2':
+        # Create model without FPN
+        model = torchvision.models.detection.maskrcnn_resnet50_fpn_v2(
+            weights="DEFAULT",
+            backbone_kwargs={"norm_layer": torch.nn.BatchNorm2d}
+        )
+    else:
+        # Create model with FPN (default)
+        model = torchvision.models.detection.maskrcnn_resnet50_fpn(
+            weights="DEFAULT",
+            backbone_kwargs={"norm_layer": torch.nn.BatchNorm2d}
+        )
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
     in_features_mask = model.roi_heads.mask_predictor.conv5_mask.in_channels
@@ -176,7 +188,7 @@ def main(cfg):
     
     # Setup device and model
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = get_model(5).to(device)
+    model = get_model(5, cfg.model).to(device)
     
     # Setup optimizer based on choice
     if cfg.optimizer == 'sgd':
@@ -244,13 +256,15 @@ def main(cfg):
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_root', default='train')
+    parser.add_argument('--data_root', default='data/train')
     parser.add_argument('--epochs', type=int, default=40)
     parser.add_argument('--batch', type=int, default=2)
     parser.add_argument('--lr', type=float, default=5e-3)
     parser.add_argument('--outdir', default='output')
     parser.add_argument('--optimizer', choices=['sgd', 'adamw'], default='sgd',
                       help='Choose optimizer: sgd or adamw')
+    parser.add_argument('--model', choices=['fpn', 'v2'], default='fpn',
+                      help='Choose model: fpn or v2')
     return parser.parse_args()
 
 

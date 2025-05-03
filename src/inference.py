@@ -13,8 +13,19 @@ from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
 from dataset import TestImageDataset
 
 
-def load_model(ckpt_path: Path, num_classes: int, device: torch.device):
-    model = torchvision.models.detection.maskrcnn_resnet50_fpn(weights="DEFAULT")
+def load_model(ckpt_path: Path, num_classes: int, device: torch.device, model_type: str = 'fpn'):
+    """Load model from checkpoint with specified type."""
+    if model_type == 'v2':
+        model = torchvision.models.detection.maskrcnn_resnet50_fpn_v2(
+            weights="DEFAULT",
+            backbone_kwargs={"norm_layer": torch.nn.BatchNorm2d}
+        )
+    else:  # fpn
+        model = torchvision.models.detection.maskrcnn_resnet50_fpn(
+            weights="DEFAULT",
+            backbone_kwargs={"norm_layer": torch.nn.BatchNorm2d}
+        )
+    
     in_feat_box = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_feat_box, num_classes)
     in_feat_mask = model.roi_heads.mask_predictor.conv5_mask.in_channels
@@ -39,7 +50,7 @@ def run_inference(args, device):
     
     ds = TestImageDataset(args.data_root)
     loader = DataLoader(ds, batch_size=1, shuffle=False)
-    model = load_model(Path(args.ckpt), num_classes=5, device=device)
+    model = load_model(Path(args.ckpt), num_classes=5, device=device, model_type=args.model)
     output = []
     
     for images, image_paths in loader:
@@ -91,12 +102,14 @@ def parse_args():
     p.add_argument('--data_root', type=str, required=True)
     p.add_argument('--ckpt', type=str, required=True)
     p.add_argument('--output', type=str, default='results.json')
+    p.add_argument('--model', choices=['fpn', 'v2'], default='fpn',
+                  help='Choose model type: fpn or v2')
     return p.parse_args()
 
 
 def main():
     args = parse_args()
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:2' if torch.cuda.is_available() else 'cpu')
     run_inference(args, device)
 
 
